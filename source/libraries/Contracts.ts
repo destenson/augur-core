@@ -22,16 +22,8 @@ export class Contracts implements Iterable<Contract> {
     public constructor(compilerOutput: CompilerOutput) {
         for (let relativeFilePath in compilerOutput.contracts) {
             for (let contractName in compilerOutput.contracts[relativeFilePath]) {
-                // don't include helper libraries
-                if (!relativeFilePath.endsWith(`${contractName}.sol`)) continue;
-                const abi = compilerOutput.contracts[relativeFilePath][contractName].abi;
-                if (abi === undefined) continue;
-                const bytecodeString = compilerOutput.contracts[relativeFilePath][contractName].evm.bytecode.object;
-                if (bytecodeString === undefined) continue;
-                // don't include interfaces
-                if (bytecodeString.length === 0) continue;
-                const bytecode = Buffer.from(bytecodeString, 'hex');
-                const compiledContract = new Contract(relativeFilePath, contractName, abi, bytecode);
+                const bytecode = Buffer.from(compilerOutput.contracts[relativeFilePath][contractName].evm.bytecode.object, 'hex');
+                const compiledContract = new Contract(relativeFilePath, contractName, compilerOutput.contracts[relativeFilePath][contractName].abi, bytecode);
                 this.contracts.set(contractName, compiledContract);
             }
         }

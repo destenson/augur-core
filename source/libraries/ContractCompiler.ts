@@ -42,15 +42,16 @@ export class ContractCompiler {
             }
             throw new Error("The following errors/warnings were returned by solc:\n\n" + errors);
         }
+        const filteredCompilerOutput = this.filterCompilerOutput(compilerOutput);
 
         // Create output directory (if it doesn't exist)
         await asyncMkdirp(path.dirname(this.configuration.contractOutputPath));
 
         // Output contract data to single file
         const contractOutputFilePath = this.configuration.contractOutputPath;
-        await fs.writeFile(contractOutputFilePath, JSON.stringify(compilerOutput, null, '\t'));
+        await fs.writeFile(contractOutputFilePath, JSON.stringify(filteredCompilerOutput, null, '\t'));
 
-        return compilerOutput;
+        return filteredCompilerOutput;
     }
 
     public async generateCompilerInput(): Promise<CompilerInput> {
@@ -82,5 +83,28 @@ export class ContractCompiler {
         }
 
         return inputJson;
+    }
+
+    private filterCompilerOutput(compilerOutput: CompilerOutput): CompilerOutput {
+        const result: CompilerOutput = { contracts: {} };
+        for (let relativeFilePath in compilerOutput.contracts) {
+            for (let contractName in compilerOutput.contracts[relativeFilePath]) {
+                // don't include helper libraries
+                if (!relativeFilePath.endsWith(`${contractName}.sol`)) continue;
+                const abi = compilerOutput.contracts[relativeFilePath][contractName].abi;
+                if (abi === undefined) continue;
+                const bytecodeString = compilerOutput.contracts[relativeFilePath][contractName].evm.bytecode.object;
+                if (bytecodeString === undefined) continue;
+                // don't include interfaces
+                if (bytecodeString.length === 0) continue;
+                result.contracts[relativeFilePath] = {
+                    [contractName]: {
+                        abi: abi,
+                        evm: { bytecode: { object: bytecodeString } }
+                    }
+                }
+            }
+        }
+        return result;
     }
 }
